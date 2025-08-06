@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Safety Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #444;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        .error {
+            color: #d9534f;
+            text-align: center;
+            padding: 20px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #f2f2f2;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .positive-change {
+            color: green;
+        }
+        .negative-change {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Food Safety Inspection Dashboard</h1>
+        
+        <div class="chart-container">
+            <div class="chart-title">Failed Food Safety Inspections (Last 6 Months)</div>
+            <div class="controls">
+                <label for="region-select">Select Region:</label>
+                <select id="region-select">
+                    <option value="">All Regions</option>
+                    <option value="1">North Region</option>
+                    <option value="2">South Region</option>
+                    <option value="3">East Region</option>
+                    <option value="4">West Region</option>
+                    <option value="5">Central Region</option>
+                </select>
+            </div>
+            <div id="failed-inspections-loading" class="loading">Loading data...</div>
+            <div id="failed-inspections-error" class="error" style="display: none;"></div>
+            <canvas id="failed-inspections-chart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Restaurant Inspection Percentages by Region</div>
+            <div id="inspection-percentages-loading" class="loading">Loading data...</div>
+            <div id="inspection-percentages-error" class="error" style="display: none;"></div>
+            <canvas id="inspection-percentages-chart"></canvas>
+            
+            <table class="data-table" id="percentages-table">
+                <thead>
+                    <tr>
+                        <th>Region</th>
+                        <th>Visited Restaurants (%)</th>
+                        <th>Change vs Last Month</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // API URL - change this to match your server
+        const API_URL = 'http://localhost:5000/api';
+        let failedInspectionsChart = null;
+        let inspectionPercentagesChart = null;
+
+        // Load failed inspections data
+        function loadFailedInspections(regionId = '') {
+            const url = `${API_URL}/failed-inspections${regionId ? `?region_id=${regionId}` : ''}`;
+            
+            document.getElementById('failed-inspections-loading').style.display = 'block';
+            document.getElementById('failed-inspections-error').style.display = 'none';
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('failed-inspections-loading').style.display = 'none';
+                    renderFailedInspectionsChart(data.data);
+                })
+                .catch(error => {
+                    document.getElementById('failed-inspections-loading').style.display = 'none';
+                    document.getElementById('failed-inspections-error').style.display = 'block';
+                    document.getElementById('failed-inspections-error').textContent = 
+                        `Error loading data: ${error.message}`;
+                });
+        }
+
+        // Load inspection percentages data
+        function loadInspectionPercentages() {
+            const url = `${API_URL}/inspection-percentages`;
+            
+            document.getElementById('inspection-percentages-loading').style.display = 'block';
+            document.getElementById('inspection-percentages-error').style.display = 'none';
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('inspection-percentages-loading').style.display = 'none';
+                    renderInspectionPercentagesChart(data.data);
+                    renderPercentagesTable(data.data);
+                })
+                .catch(error => {
+                    document.getElementById('inspection-percentages-loading').style.display = 'none';
+                    document.getElementById('inspection-percentages-error').style.display = 'block';
+                    document.getElementById('inspection-percentages-error').textContent = 
+                        `Error loading data: ${error.message}`;
+                });
+        }
+
+        // Render failed inspections chart
+        function renderFailedInspectionsChart(data) {
+            // Sort data by year and month
+            data.sort((a, b) => {
+                if (a.year !== b.year) {
+                    return a.year - b.year;
+                }
+                return a.month - b.month;
+            });
+            
+            const labels = data.map(item => `${item.month}/${item.year}`);
+            const values = data.map(item => item.failed_inspections);
+            
+            const ctx = document.getElementById('failed-inspections-chart').getContext('2d');
+            
+            if (failedInspectionsChart) {
+                failedInspectionsChart.destroy();
+            }
+            
+            failedInspectionsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Failed Inspections',
+                        data: values,
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Failed Inspections'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month/Year'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render inspection percentages chart
+        function renderInspectionPercentagesChart(data) {
+            const labels = data.map(item => item.region_name);
+            const percentages = data.map(item => item.visited_restaurants_percentage);
+            const changes = data.map(item => item.change_vs_last_month);
+            
+            const ctx = document.getElementById('inspection-percentages-chart').getContext('2d');
+            
+            if (inspectionPercentagesChart) {
+                inspectionPercentagesChart.destroy();
+            }
+            
+            inspectionPercentagesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Visited Restaurants (%)',
+                        data: percentages,
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Percentage of Restaurants Visited'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render percentages table
+        function renderPercentagesTable(data) {
+            const tableBody = document.querySelector('#percentages-table tbody');
+            tableBody.innerHTML = '';
+            
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                
+                const regionCell = document.createElement('td');
+                regionCell.textContent = item.region_name;
+                
+                const percentageCell = document.createElement('td');
+                percentageCell.textContent = `${item.visited_restaurants_percentage.toFixed(2)}%`;
+                
+                const changeCell = document.createElement('td');
+                const change = item.change_vs_last_month;
+                changeCell.textContent = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeCell.className = change >= 0 ? 'positive-change' : 'negative-change';
+                
+                row.appendChild(regionCell);
+                row.appendChild(percentageCell);
+                row.appendChild(changeCell);
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Event listeners
+        document.getElementById('region-select').addEventListener('change', function() {
+            loadFailedInspections(this.value);
+        });
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFailedInspections();
+            loadInspectionPercentages();
+        });
+    </script>
+</body>
+</html>
