@@ -70,3 +70,14 @@ python3 api.py
 - Implemented responsive charts that adapt to different data
 - Added region filtering to demonstrate interactive features
 - Used Flask's built-in server for simplicity
+
+
+
+
+## Screens 
+
+<img width="1687" height="932" alt="monthly chart" src="https://github.com/user-attachments/assets/0eeb89e2-df50-456b-b154-8b47486973ca" />
+<img width="1696" height="940" alt="sales charts" src="https://github.com/user-attachments/assets/f4158217-7225-45b2-bff9-f6bf3baa5384" />
+<img width="788" height="676" alt="api2" src="https://github.com/user-attachments/assets/ddbdd237-30cb-4cb0-9839-62aa03a5ab08" />
+<img width="724" height="669" alt="api1" src="https://github.com/user-attachments/assets/75058508-48d4-4ada-bc86-bc73ead211b1" />
+<img width="929" height="876" alt="apis" src="https://github.com/user-attachments/assets/322009b3-e975-4d6c-88c5-683d02ef2a5b" />
